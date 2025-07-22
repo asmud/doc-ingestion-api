@@ -235,7 +235,7 @@ class DocumentIntelligencePipeline:
                 })
         return results
     
-    def chunk_document(self, document: DoclingDocument, chunk_size: Optional[int] = None, overlap: Optional[int] = None, tokenizer_name: Optional[str] = None) -> List[Dict[str, Any]]:
+    def chunk_document(self, document: DoclingDocument, chunk_size: Optional[int] = None, overlap: Optional[int] = None, tokenizer_name: Optional[str] = None, chunk_embeddings: Optional[List[List[float]]] = None) -> List[Dict[str, Any]]:
         chunk_size = chunk_size or self.config.chunk_size
         overlap = overlap or self.config.chunk_overlap
         tokenizer_path = tokenizer_name or str(self.config.tokenizer_model_dir)
@@ -308,6 +308,10 @@ class DocumentIntelligencePipeline:
                     "char_count": len(chunk.text)
                 }
             }
+            
+            # Add embedding if provided
+            if chunk_embeddings and i < len(chunk_embeddings):
+                chunk_dict["embedding"] = chunk_embeddings[i]
             chunk_list.append(chunk_dict)
         
         return chunk_list
@@ -339,7 +343,7 @@ class DocumentIntelligencePipeline:
             
             return {
                 "document_embedding": doc_embedding,
-                "chunk_embeddings": chunk_embeddings,
+                "chunk_embeddings": chunk_embeddings,  # Keep for internal use
                 "embedding_dimension": model_info["embedding_dimension"],
                 "embedding_model": model_info["model_name"],
                 "total_chunks": len(chunks)
@@ -387,9 +391,18 @@ class DocumentIntelligencePipeline:
             
         elif mode == ProcessingMode.embedding:
             # Only embedding generation
-            chunks = self.chunk_document(document)  # Need chunks for chunk-level embeddings
-            embedding_data = self.generate_embeddings(document, chunks)
-            result.update(embedding_data)
+            chunks_basic = self.chunk_document(document)  # Basic chunks first
+            embedding_data = self.generate_embeddings(document, chunks_basic)
+            
+            # Create chunks with embeddings integrated
+            chunks_with_embeddings = self.chunk_document(document, chunk_embeddings=embedding_data["chunk_embeddings"])
+            
+            # Add to result without chunk_embeddings array
+            result["document_embedding"] = embedding_data["document_embedding"]
+            result["embedding_dimension"] = embedding_data["embedding_dimension"] 
+            result["embedding_model"] = embedding_data["embedding_model"]
+            result["chunks"] = chunks_with_embeddings  # Chunks now contain individual embeddings
+            result["total_chunks"] = len(chunks_with_embeddings)
             
         elif mode == ProcessingMode.full:
             # All features: text_only + chunks_only + embedding
@@ -397,14 +410,19 @@ class DocumentIntelligencePipeline:
             result["content"] = self.format_document(document, output_format)
             result["formatted_content"] = self.format_document(document, output_format)
             
-            # Chunking
-            chunks = self.chunk_document(document)
-            result["chunks"] = chunks
-            result["total_chunks"] = len(chunks)
+            # Chunking and embedding generation
+            chunks_basic = self.chunk_document(document)
+            embedding_data = self.generate_embeddings(document, chunks_basic)
             
-            # Embedding
-            embedding_data = self.generate_embeddings(document, chunks)
-            result.update(embedding_data)
+            # Create chunks with embeddings integrated
+            chunks_with_embeddings = self.chunk_document(document, chunk_embeddings=embedding_data["chunk_embeddings"])
+            
+            # Add chunks and embeddings to result
+            result["chunks"] = chunks_with_embeddings  # Chunks now contain individual embeddings
+            result["total_chunks"] = len(chunks_with_embeddings)
+            result["document_embedding"] = embedding_data["document_embedding"]
+            result["embedding_dimension"] = embedding_data["embedding_dimension"] 
+            result["embedding_model"] = embedding_data["embedding_model"]
             
         else:
             raise ValueError(f"Unsupported processing mode: {mode}")

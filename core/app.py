@@ -141,10 +141,14 @@ async def startup_tasks():
                     logging_config = get_logging_config()
                     celery_log_level = logging_config.get_celery_log_level_string()
                     
+                    # Use threads on macOS to avoid fork issues with ML libraries
+                    pool_type = "threads" if os.uname().sysname == 'Darwin' else "prefork"
+                    
                     worker_cmd = [
                         "celery", "-A", "core.celery_app", "worker",
                         f"--loglevel={celery_log_level}", "--concurrency=2",
-                        "--queues=documents,batch,crawl"
+                        "--queues=documents,batch,crawl",
+                        f"--pool={pool_type}"
                     ]
                     
                     logger.info("Starting embedded Celery worker...")

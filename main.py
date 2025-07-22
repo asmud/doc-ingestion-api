@@ -6,6 +6,13 @@ import sys
 import warnings
 import uvicorn
 from dotenv import load_dotenv
+
+# Fix for macOS ML library issues - must be set before importing anything else
+if os.uname().sysname == 'Darwin':  # macOS
+    os.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = '1'
+    os.environ['PYTORCH_MPS_HIGH_WATERMARK_RATIO'] = '0.0'
+    # Prevent MPS initialization in forked processes
+    os.environ['PYTORCH_MPS_ALLOCATOR_DISABLE'] = '1'
 from core.logging_config import setup_logging
 from core.app import app, cleanup_resources
 import logging

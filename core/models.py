@@ -26,7 +26,6 @@ class ProcessedContent(BaseModel):
     
     # Present in "embedding" and "full" modes
     document_embedding: Optional[List[float]] = Field(None, description="Document-level embedding vector (available in 'embedding' and 'full' modes)")
-    chunk_embeddings: Optional[List[List[float]]] = Field(None, description="Chunk-level embedding vectors (available in 'embedding' and 'full' modes)")
     embedding_dimension: Optional[int] = Field(None, description="Dimension of embedding vectors")
     embedding_model: Optional[str] = Field(None, description="Model used for embedding generation")
     

@@ -7,10 +7,45 @@ import time
 import signal
 import logging
 import gc
+import os
+import multiprocessing
+
+# Fix for macOS forking issues with ML libraries
+if os.uname().sysname == 'Darwin':  # macOS
+    multiprocessing.set_start_method('spawn', force=True)
+    # Disable MPS on macOS to prevent fork issues
+    os.environ['PYTORCH_ENABLE_MPS_FALLBACK'] = '1'
+    os.environ['PYTORCH_MPS_HIGH_WATERMARK_RATIO'] = '0.0'
 
 # Setup Celery worker logging
 setup_logging("celery")
 logger = logging.getLogger(__name__)
+
+# Configure Celery trace logging to not show results
+def configure_celery_logging():
+    """Configure Celery logging to hide large task results"""
+    import logging
+    
+    # Get the celery.app.trace logger and modify it
+    trace_logger = logging.getLogger('celery.app.trace')
+    
+    class TaskResultFilter(logging.Filter):
+        """Filter to clean up task result logging"""
+        def filter(self, record):
+            if hasattr(record, 'msg') and 'succeeded' in str(record.msg):
+                # If this is a success message, clean it up
+                if ' -> ' in str(record.msg):
+                    # Split at ' -> ' and keep only the part before it
+                    parts = str(record.msg).split(' -> ', 1)
+                    record.msg = parts[0]  # Keep only the success/timing part
+                    record.args = ()  # Clear any args that might contain the result
+            return True
+    
+    # Add our filter to the trace logger
+    trace_logger.addFilter(TaskResultFilter())
+
+# Apply the logging configuration
+configure_celery_logging()
 
 celery_config = CeleryConfig()
 celery_app = Celery('doc_ingestion')
@@ -37,6 +72,13 @@ celery_app.conf.update(
     worker_cancel_long_running_tasks_on_connection_loss=True,
     task_reject_on_worker_lost=True,
     worker_max_tasks_per_child=1000,  # Restart workers periodically to prevent memory leaks
+    # Use threads instead of processes on macOS to avoid fork issues
+    worker_pool='threads' if os.uname().sysname == 'Darwin' else 'prefork',
+    worker_concurrency=2,
+    # Clean up task result logging - don't log large document content
+    task_ignore_result=False,  # Keep results for API but control logging
+    worker_log_format='[%(asctime)s: %(levelname)s/%(processName)s] %(message)s',
+    worker_task_log_format='[%(asctime)s: %(levelname)s/%(processName)s][%(task_name)s(%(task_id)s)] %(message)s',
 )
 
 # Global pipeline instance for cleanup

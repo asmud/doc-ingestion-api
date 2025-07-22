@@ -41,7 +41,7 @@ class EmbeddingService:
                     raise FileNotFoundError(f"Model path does not exist: {actual_model_path}")
                 
                 logger.info(f"Loading embedding model from: {actual_model_path}")
-                self.model = SentenceTransformer(str(actual_model_path), device=self.device)
+                self.model = SentenceTransformer(str(actual_model_path), device=self.device, trust_remote_code=True)
                 logger.info("Embedding model loaded successfully")
                 
             except ImportError:
