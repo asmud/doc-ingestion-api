@@ -17,8 +17,8 @@ class HealthResponse(BaseModel):
 
 class ProcessedContent(BaseModel):
     # Present in "text_only" and "full" modes
-    content: Optional[Union[str, Dict[str, Any]]] = Field(None, description="Processed document content (available in 'text_only' and 'full' modes)")
-    formatted_content: Optional[Union[str, Dict[str, Any]]] = Field(None, description="Formatted document content (available in 'text_only' and 'full' modes)")
+    content: Optional[str] = Field(None, description="Raw extracted text content from document (available in 'text_only' and 'full' modes)")
+    formatted_content: Optional[Union[str, Dict[str, Any]]] = Field(None, description="Document content formatted according to output_format (json/markdown/html/text) (available in 'text_only' and 'full' modes)")
     
     # Present in "chunks_only" and "full" modes  
     chunks: Optional[List[Dict[str, Any]]] = Field(None, description="Document chunks (available in 'chunks_only' and 'full' modes)")
@@ -41,9 +41,6 @@ class DocumentResponse(BaseModel):
     filename: Optional[str] = Field(None, description="Original filename")
     file_extension: Optional[str] = Field(None, description="File extension")
     file_size: Optional[int] = Field(None, description="File size in bytes")
-    url: Optional[str] = Field(None, description="Source URL if processed from URL")
-    content_type: Optional[str] = Field(None, description="MIME content type")
-    content_length: Optional[int] = Field(None, description="Content length in bytes")
     output_format: str = Field(..., description="Output format used")
     processing_mode: ProcessingMode = Field(..., description="Processing mode used")
     processed_content: ProcessedContent = Field(..., description="Processed document content and metadata")

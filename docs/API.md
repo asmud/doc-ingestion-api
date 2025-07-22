@@ -71,9 +71,10 @@ curl -X GET "http://localhost:8000/formats"
 
 ### Processing Modes
 
-- **`full`**: Complete document processing with formatted output (default)
+- **`text_only`**: Document conversion and formatting only (text extraction)
 - **`chunks_only`**: Document chunking without full formatting (faster, optimized for RAG)
-- **`both`**: Full processing AND chunking (comprehensive analysis)
+- **`embedding`**: Generate document-level and chunk-level embeddings using nomic-embed-text-v1.5
+- **`full`**: All features - text conversion, chunking, and embedding generation (comprehensive, default)
 
 ### Output Formats
 
@@ -82,6 +83,24 @@ curl -X GET "http://localhost:8000/formats"
 - **`text`**: Plain text output  
 - **`html`**: HTML formatted output
 
+### Content Fields Explanation
+
+The API returns two distinct content fields:
+
+- **`content`**: Raw extracted text from the document (always plain text, regardless of output_format)
+- **`formatted_content`**: Content formatted according to the requested `output_format` (JSON/Markdown/HTML/Text)
+
+This allows you to:
+- Use `content` for further processing, search, or analysis (consistent format)
+- Use `formatted_content` for display or consumption in the desired format
+
+### Embedding Fields (in `embedding` and `full` modes)
+
+- **`document_embedding`**: 768-dimensional vector representing the entire document
+- **`embedding_dimension`**: Size of embedding vectors (768)
+- **`embedding_model`**: Model used for embeddings ("nomic-embed-text-v1.5")
+- **`chunks[].embedding`**: 768-dimensional vector for each individual chunk
+
 ### POST /process/upload
 
 Process one or more uploaded document files synchronously.
@@ -89,7 +108,7 @@ Process one or more uploaded document files synchronously.
 **Parameters:**
 - `files` (required): Document file(s) to process
 - `output_format` (optional): Output format (`json`, `markdown`, `text`, `html`)
-- `processing_mode` (optional): Processing mode (`full`, `chunks_only`, `both`)
+- `processing_mode` (optional): Processing mode (`text_only`, `chunks_only`, `embedding`, `full`)
 
 **Example:**
 ```bash
@@ -109,10 +128,31 @@ curl -X POST "http://localhost:8000/process/upload" \
   "output_format": "json",
   "processing_mode": "full",
   "processed_content": {
-    "content": {"text": "Document content...", "metadata": {}},
+    "content": "Raw extracted text content from document...",
+    "formatted_content": {"text": "Document content...", "metadata": {}},
+    "chunks": [
+      {
+        "chunk_id": 0,
+        "text": "First chunk of document content...",
+        "num_tokens": 150,
+        "embedding": [0.1, -0.2, 0.3, ...],  // 768-dimensional vector
+        "metadata": {
+          "page_numbers": [1],
+          "chapter": "Introduction",
+          "section": null,
+          "chunk_type": "text",
+          "char_count": 485
+        }
+      }
+    ],
+    "total_chunks": 3,
+    "document_embedding": [0.05, -0.12, 0.08, ...],  // 768-dimensional vector
+    "embedding_dimension": 768,
+    "embedding_model": "nomic-embed-text-v1.5",
     "word_count": 1250,
     "char_count": 8456,
-    "extraction_method": "docling"
+    "extraction_method": "docling",
+    "processing_mode": "full"
   },
   "status": "success",
   "timestamp": 1705312200.123
@@ -380,7 +420,7 @@ curl -X POST "http://localhost:8000/process/urls/batch/async" \
       "https://example.com/webpage.html"
     ],
     "output_format": "markdown",
-    "processing_mode": "both"
+    "processing_mode": "full"
   }'
 ```
 

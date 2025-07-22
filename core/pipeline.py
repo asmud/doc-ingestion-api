@@ -380,8 +380,8 @@ class DocumentIntelligencePipeline:
         
         if mode == ProcessingMode.text_only:
             # Only text processing and formatting
-            result["content"] = self.format_document(document, output_format)
-            result["formatted_content"] = self.format_document(document, output_format)
+            result["content"] = document.export_to_text()  # Raw text content
+            result["formatted_content"] = self.format_document(document, output_format)  # Formatted according to output_format
             
         elif mode == ProcessingMode.chunks_only:
             # Only chunking
@@ -398,6 +398,7 @@ class DocumentIntelligencePipeline:
             chunks_with_embeddings = self.chunk_document(document, chunk_embeddings=embedding_data["chunk_embeddings"])
             
             # Add to result without chunk_embeddings array
+            #result["content"] = document.export_to_text()  # Raw text content
             result["document_embedding"] = embedding_data["document_embedding"]
             result["embedding_dimension"] = embedding_data["embedding_dimension"] 
             result["embedding_model"] = embedding_data["embedding_model"]
@@ -407,8 +408,8 @@ class DocumentIntelligencePipeline:
         elif mode == ProcessingMode.full:
             # All features: text_only + chunks_only + embedding
             # Text processing
-            result["content"] = self.format_document(document, output_format)
-            result["formatted_content"] = self.format_document(document, output_format)
+            result["content"] = document.export_to_text()  # Raw text content
+            result["formatted_content"] = self.format_document(document, output_format)  # Formatted according to output_format
             
             # Chunking and embedding generation
             chunks_basic = self.chunk_document(document)

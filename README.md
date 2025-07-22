@@ -67,8 +67,18 @@ curl -X POST "http://localhost:8000/process/urls/crawl/async" \
 
 - **`text_only`**: Document conversion and formatting only (text extraction)
 - **`chunks_only`**: Fast chunking for RAG applications (optimized for vector databases)
-- **`embedding`**: Generate document-level and chunk-level embeddings using nomic-embed-text
+- **`embedding`**: Generate document-level and chunk-level embeddings using nomic-embed-text-v1.5
 - **`full`**: All features - text conversion, chunking, and embedding generation (comprehensive)
+
+## Content Fields
+
+The API returns two distinct content fields in processing responses:
+- **`content`**: Raw extracted text from the document (always plain text)
+- **`formatted_content`**: Content formatted according to the requested `output_format` (JSON/Markdown/HTML/Text)
+
+This allows flexible usage:
+- Use `content` for further processing, search, or analysis (consistent format)
+- Use `formatted_content` for display or consumption in the desired format
 
 ## Configuration
 

@@ -39,6 +39,29 @@ graph TB
 - Error handling and HTTP status management
 - Job submission to background queue
 
+**Modular Architecture:**
+```
+core/           # Core application logic
+├── app.py      # FastAPI configuration and startup
+├── api.py      # REST API endpoints
+├── pipeline.py # Document processing pipeline
+├── models.py   # Pydantic schemas
+├── config.py   # Configuration management
+├── celery_app.py  # Background task processing
+└── logging_config.py  # Logging setup
+
+processor/      # Document processing modules
+├── doc.py      # File upload processing
+├── web.py      # URL and web crawling
+├── custom_asr.py   # Audio processing
+└── embedding.py    # Semantic embeddings
+
+utils/          # Shared utilities
+├── utils.py    # Common functions
+├── processing_utils.py  # Processing helpers
+└── job_manager.py      # Background job management
+```
+
 **Key Features:**
 - **Sync/Async Endpoints**: Both immediate and background processing
 - **File Upload Handling**: Multipart form data processing
@@ -76,10 +99,10 @@ class DocumentIntelligencePipeline:
 ```
 
 **Processing Modes:**
-- **Text Only**: Document conversion and formatting only (text extraction)
-- **Chunks Only**: Fast chunking for RAG applications (optimized for vector databases)
-- **Embedding**: Generate document-level and chunk-level embeddings using nomic-embed-text
-- **Full**: All features - text conversion, chunking, and embedding generation
+- **`text_only`**: Document conversion and formatting only (text extraction)
+- **`chunks_only`**: Fast chunking for RAG applications (optimized for vector databases)
+- **`embedding`**: Generate document-level and chunk-level embeddings using nomic-embed-text-v1.5
+- **`full`**: All features - text conversion, chunking, and embedding generation (comprehensive)
 
 ### 3. Background Processing (Celery)
 
@@ -110,9 +133,35 @@ Celery Workers             ← Task Execution
 Redis Backend (Database 10) ← Result Storage
 ```
 
-### 4. Data Models and Validation
+### 4. Embedding Service
 
-**Location**: `models.py`
+**Location**: `processor/embedding.py`
+
+**Responsibilities:**
+- Semantic embedding generation using nomic-embed-text-v1.5
+- Document-level embedding creation (768-dimensional vectors)
+- Chunk-level embedding creation for individual text segments
+- Device optimization (CPU/CUDA/MPS support)
+- Batch processing for efficient embedding generation
+
+**Key Features:**
+```python
+class EmbeddingService:
+    - Model Loading: Lazy initialization with local model support
+    - Document Embeddings: Full document semantic vectors
+    - Chunk Embeddings: Individual chunk semantic vectors
+    - Batch Processing: Efficient batch embedding generation
+    - Device Management: CPU/GPU/MPS optimization
+```
+
+**Integration:**
+- Used by `DocumentIntelligencePipeline` for embedding modes
+- Embeddings integrated directly into chunk objects
+- Supports both standalone and combined processing modes
+
+### 5. Data Models and Validation
+
+**Location**: `core/models.py`
 
 **Responsibilities:**
 - Request/response schema validation
@@ -135,9 +184,9 @@ BaseResponse → ProcessingResponse
                └── JobResponse
 ```
 
-### 5. Job Management
+### 6. Job Management
 
-**Location**: `job_manager.py`
+**Location**: `utils/job_manager.py`
 
 **Responsibilities:**
 - Job status tracking across lifecycle
@@ -204,7 +253,8 @@ models/
 ├── ds4sd--DocumentFigureClassifier/ # Figure classification (100MB)
 ├── ds4sd--CodeFormula/              # Formula detection (500MB)
 ├── nomic-embed-text-v1.5/           # Text embeddings (500MB)
-└── cahya--whisper-medium-id/        # Speech recognition (1.5GB)
+│   └── snapshots/f752c1ee.../       # Actual model files for embeddings
+└── cahya--whisper-medium-id/        # Indonesian speech recognition (1.5GB)
 ```
 
 ### Model Loading Strategy
