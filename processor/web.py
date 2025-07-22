@@ -4,13 +4,14 @@ import requests
 from urllib.parse import urlparse, urljoin, urlunparse
 from bs4 import BeautifulSoup
 import time
-from logging_config import get_processing_logger
-from pipeline import DocumentIntelligencePipeline
-from utils import get_current_timestamp, handle_processing_error, validate_url
+from core.logging_config import get_processing_logger
+# Remove circular import - will import dynamically when needed
+from utils.utils import get_current_timestamp, handle_processing_error, validate_url
 
 logger = get_processing_logger(__name__)
 
 try:
+    from core.pipeline import DocumentIntelligencePipeline
     pipeline = DocumentIntelligencePipeline()
 except Exception:
     pipeline = None
@@ -24,70 +25,8 @@ async def process_document_url(url: str, output_format: str = "json", processing
     
     content_type, content_length = _get_url_metadata(url)
     
-    if processing_mode == "chunks_only":
-        chunks = pipeline.process_and_chunk_document(url)
-        total_text = " ".join([chunk.get("text", "") for chunk in chunks])
-        word_count = len(total_text.split()) if total_text else 0
-        char_count = len(total_text) if total_text else 0
-            
-        processed_data = {
-            "chunks": chunks,
-            "total_chunks": len(chunks),
-            "word_count": word_count,
-            "char_count": char_count,
-            "extraction_method": "docling_url_chunks_only",
-            "processing_mode": processing_mode
-        }
-    elif processing_mode == "both":
-        chunks = pipeline.process_and_chunk_document(url)
-        formatted_content = pipeline.process_and_format_document(url, output_format)
-        
-        if output_format == "text":
-            text_content = formatted_content
-            word_count = len(text_content.split()) if isinstance(text_content, str) else 0
-            char_count = len(text_content) if isinstance(text_content, str) else 0
-        else:
-            try:
-                text_content = pipeline.process_and_format_document(url, "text")
-                word_count = len(text_content.split()) if isinstance(text_content, str) else 0
-                char_count = len(text_content) if isinstance(text_content, str) else 0
-            except:
-                word_count = 0
-                char_count = 0
-            
-        processed_data = {
-            "content": formatted_content,
-            "formatted_content": formatted_content,
-            "chunks": chunks,
-            "total_chunks": len(chunks),
-            "word_count": word_count,
-            "char_count": char_count,
-            "extraction_method": "docling_url_full_and_chunks",
-            "processing_mode": processing_mode
-        }
-    else:
-        formatted_content = pipeline.process_and_format_document(url, output_format)
-        
-        if output_format == "text":
-            text_content = formatted_content
-            word_count = len(text_content.split()) if isinstance(text_content, str) else 0
-            char_count = len(text_content) if isinstance(text_content, str) else 0
-        else:
-            try:
-                text_content = pipeline.process_and_format_document(url, "text")
-                word_count = len(text_content.split()) if isinstance(text_content, str) else 0
-                char_count = len(text_content) if isinstance(text_content, str) else 0
-            except:
-                word_count = 0
-                char_count = 0
-            
-        processed_data = {
-            "content": formatted_content,
-            "word_count": word_count,
-            "char_count": char_count,
-            "extraction_method": "docling_url_full",
-            "processing_mode": processing_mode
-        }
+    # Use the new mode-based processing from pipeline
+    processed_data = pipeline.process_document_with_mode(url, processing_mode, output_format)
     
     return {
         "url": url,

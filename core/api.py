@@ -1,10 +1,10 @@
 from fastapi import HTTPException, UploadFile, File, Query
 from typing import List, Dict, Any, Optional, Union
 import time
-from utils import get_current_iso_timestamp, handle_processing_error, create_error_response
-from doc import process_document_file, get_supported_formats
-from web import process_document_url, process_document_urls_batch, crawl_website
-from models import (
+from utils.utils import get_current_iso_timestamp, handle_processing_error, create_error_response
+from processor.doc import process_document_file, get_supported_formats
+from processor.web import process_document_url, process_document_urls_batch, crawl_website
+from core.models import (
     ProcessingMode,
     HealthResponse,
     DocumentResponse,
@@ -19,7 +19,7 @@ from models import (
     DocumentURLsBatchRequest,
     DocumentCrawlRequest
 )
-from app import app
+from core.app import app
 
 @app.get("/health",
          summary="Health Check",
@@ -237,7 +237,7 @@ async def process_document_from_url(request: DocumentURLRequest):
 async def process_document_upload(
     files: List[UploadFile] = File(..., description="Document file(s) to process. Supports multiple file upload."),
     output_format: str = Query("json", description="Output format for processed content", enum=["json", "markdown", "text", "html"]),
-    processing_mode: str = Query("full", description="Processing mode", enum=["full", "chunks_only", "both"])
+    processing_mode: str = Query("full", description="Processing mode", enum=["text_only", "chunks_only", "embedding", "full"])
 ):
     """
     Process uploaded document files using the advanced Docling pipeline.
@@ -255,9 +255,10 @@ async def process_document_upload(
     - Supported formats: All Docling-compatible formats
     
     ## Processing Modes:
-    - **full** (default): Process and format document only (traditional behavior)
-    - **chunks_only**: Only chunk the document, skip formatted content (optimized for RAG)
-    - **both**: Process document AND chunk it (comprehensive analysis)
+    - **text_only**: Document conversion and formatting only (text extraction)
+    - **chunks_only**: Only chunk the document, skip text formatting (optimized for RAG)
+    - **embedding**: Generate document-level and chunk-level embeddings using nomic-embed-text
+    - **full** (default): All features - text conversion, chunking, and embedding generation
     
     ## Processing Options:
     - **output_format**: Choose how you want the extracted content formatted
@@ -272,7 +273,7 @@ async def process_document_upload(
             return result
         else:
             # Multiple files processing - use batch
-            from doc import process_document_files_batch
+            from processor.doc import process_document_files_batch
             result = await process_document_files_batch(files, output_format, processing_mode)
             return result
     except HTTPException:
@@ -299,8 +300,8 @@ async def process_document_from_url_async(request: DocumentURLRequest):
     """
     try:
         # Initialize Celery app and job manager if not done
-        from celery_app import celery_app
-        from job_manager import init_job_manager, get_job_manager
+        from core.celery_app import celery_app
+        from utils.job_manager import init_job_manager, get_job_manager
         
         try:
             job_manager = get_job_manager()
@@ -338,7 +339,7 @@ async def process_document_from_url_async(request: DocumentURLRequest):
 async def process_document_upload_async(
     files: List[UploadFile] = File(..., description="Document file(s) to process. Supports multiple file upload."),
     output_format: str = Query("json", description="Output format for processed content", enum=["json", "markdown", "text", "html"]),
-    processing_mode: str = Query("full", description="Processing mode", enum=["full", "chunks_only", "both"])
+    processing_mode: str = Query("full", description="Processing mode", enum=["text_only", "chunks_only", "embedding", "full"])
 ):
     """
     Submit document processing jobs to run in the background.
@@ -355,8 +356,8 @@ async def process_document_upload_async(
     """
     try:
         # Initialize Celery app and job manager if not done
-        from celery_app import celery_app
-        from job_manager import init_job_manager, get_job_manager
+        from core.celery_app import celery_app
+        from utils.job_manager import init_job_manager, get_job_manager
         
         try:
             job_manager = get_job_manager()
@@ -432,8 +433,8 @@ async def process_document_urls_batch_async(request: DocumentURLsBatchRequest):
             raise HTTPException(status_code=400, detail="Maximum 20 URLs allowed per batch request")
         
         # Initialize Celery app and job manager if not done
-        from celery_app import celery_app
-        from job_manager import init_job_manager, get_job_manager
+        from core.celery_app import celery_app
+        from utils.job_manager import init_job_manager, get_job_manager
         
         try:
             job_manager = get_job_manager()
@@ -481,8 +482,8 @@ async def crawl_and_process_website_async(request: DocumentCrawlRequest):
     """
     try:
         # Initialize Celery app and job manager if not done
-        from celery_app import celery_app
-        from job_manager import init_job_manager, get_job_manager
+        from core.celery_app import celery_app
+        from utils.job_manager import init_job_manager, get_job_manager
         
         try:
             job_manager = get_job_manager()
@@ -547,7 +548,7 @@ def get_job_status(job_id: str):
     - **REVOKED**: Job was cancelled
     """
     try:
-        from job_manager import get_job_manager
+        from utils.job_manager import get_job_manager
         job_manager = get_job_manager()
         return job_manager.get_job_status(job_id)
     except RuntimeError as e:
@@ -582,7 +583,7 @@ def get_job_result(job_id: str, timeout: Optional[int] = Query(None, description
     - **500**: Internal error
     """
     try:
-        from job_manager import get_job_manager
+        from utils.job_manager import get_job_manager
         job_manager = get_job_manager()
         return job_manager.get_job_result(job_id, timeout)
     except RuntimeError as e:

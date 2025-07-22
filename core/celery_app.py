@@ -1,7 +1,7 @@
 from celery import Celery
 from celery.signals import worker_shutdown, worker_ready, worker_process_init
-from config import CeleryConfig
-from logging_config import setup_logging
+from core.config import CeleryConfig
+from core.logging_config import setup_logging
 from typing import List, Dict, Any
 import time
 import signal
@@ -79,7 +79,7 @@ def get_or_create_pipeline():
     """Get or create pipeline instance with proper cleanup tracking"""
     global _pipeline_instance
     if _pipeline_instance is None:
-        from pipeline import DocumentIntelligencePipeline
+        from core.pipeline import DocumentIntelligencePipeline
         _pipeline_instance = DocumentIntelligencePipeline()
         logger.info("Created new pipeline instance")
     return _pipeline_instance
@@ -87,7 +87,7 @@ def get_or_create_pipeline():
 @celery_app.task(bind=True, name='process_document_file_task')
 def process_document_file_task(self, file_data: bytes, filename: str, output_format: str = "json", processing_mode: str = "full"):
     try:
-        from doc import process_document_file_from_bytes
+        from processor.doc import process_document_file_from_bytes
         result = process_document_file_from_bytes(file_data, filename, output_format, processing_mode)
         return result
     except Exception as exc:
@@ -101,7 +101,7 @@ def process_document_file_task(self, file_data: bytes, filename: str, output_for
 @celery_app.task(bind=True, name='process_document_url_task')
 def process_document_url_task(self, url: str, output_format: str = "json", processing_mode: str = "full"):
     try:
-        from web import process_document_url
+        from processor.web import process_document_url
         import asyncio
         result = asyncio.run(process_document_url(url, output_format, processing_mode))
         return result
@@ -115,7 +115,7 @@ def process_document_url_task(self, url: str, output_format: str = "json", proce
 @celery_app.task(bind=True, name='process_batch_files_task')
 def process_batch_files_task(self, files_data: List[Dict[str, Any]], output_format: str = "json", processing_mode: str = "full"):
     try:
-        from doc import process_document_files_batch_from_data
+        from processor.doc import process_document_files_batch_from_data
         result = process_document_files_batch_from_data(files_data, output_format, processing_mode)
         return result
     except Exception as exc:
@@ -128,7 +128,7 @@ def process_batch_files_task(self, files_data: List[Dict[str, Any]], output_form
 @celery_app.task(bind=True, name='process_batch_urls_task')
 def process_batch_urls_task(self, urls: List[str], output_format: str = "json", processing_mode: str = "full"):
     try:
-        from web import process_document_urls_batch
+        from processor.web import process_document_urls_batch
         import asyncio
         result = asyncio.run(process_document_urls_batch(urls, output_format, processing_mode))
         return result
@@ -142,7 +142,7 @@ def process_batch_urls_task(self, urls: List[str], output_format: str = "json", 
 @celery_app.task(bind=True, name='crawl_website_task')
 def crawl_website_task(self, base_url: str, max_depth: int = 2, same_domain_only: bool = True, output_format: str = "json", processing_mode: str = "full", max_pages: int = 50):
     try:
-        from web import crawl_website
+        from processor.web import crawl_website
         import asyncio
         result = asyncio.run(crawl_website(base_url, max_depth, same_domain_only, output_format, processing_mode, max_pages))
         return result

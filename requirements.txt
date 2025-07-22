@@ -2,6 +2,7 @@ docling>=2.42.0
 torch>=2.5.0
 torchvision>=0.20.0
 transformers>=4.46.0
+sentence-transformers>=3.0.0
 easyocr>=1.7.2
 Pillow>=10.4.0
 numpy>=1.26.0

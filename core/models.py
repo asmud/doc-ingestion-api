@@ -4,9 +4,10 @@ from enum import Enum
 
 # Enums
 class ProcessingMode(str, Enum):
+    text_only = "text_only"
+    chunks_only = "chunks_only"
+    embedding = "embedding"
     full = "full"
-    chunks_only = "chunks_only" 
-    both = "both"
 
 # Response Models
 class HealthResponse(BaseModel):
@@ -15,13 +16,19 @@ class HealthResponse(BaseModel):
     timestamp: str = Field(..., description="Timestamp of the health check")
 
 class ProcessedContent(BaseModel):
-    # Present in "full" and "both" modes
-    content: Optional[Union[str, Dict[str, Any]]] = Field(None, description="Processed document content (available in 'full' and 'both' modes)")
-    formatted_content: Optional[Union[str, Dict[str, Any]]] = Field(None, description="Formatted document content (available in 'full' and 'both' modes)")
+    # Present in "text_only" and "full" modes
+    content: Optional[Union[str, Dict[str, Any]]] = Field(None, description="Processed document content (available in 'text_only' and 'full' modes)")
+    formatted_content: Optional[Union[str, Dict[str, Any]]] = Field(None, description="Formatted document content (available in 'text_only' and 'full' modes)")
     
-    # Present in "chunks_only" and "both" modes  
-    chunks: Optional[List[Dict[str, Any]]] = Field(None, description="Document chunks (available in 'chunks_only' and 'both' modes)")
+    # Present in "chunks_only" and "full" modes  
+    chunks: Optional[List[Dict[str, Any]]] = Field(None, description="Document chunks (available in 'chunks_only' and 'full' modes)")
     total_chunks: Optional[int] = Field(None, description="Total number of chunks (available when chunks are present)")
+    
+    # Present in "embedding" and "full" modes
+    document_embedding: Optional[List[float]] = Field(None, description="Document-level embedding vector (available in 'embedding' and 'full' modes)")
+    chunk_embeddings: Optional[List[List[float]]] = Field(None, description="Chunk-level embedding vectors (available in 'embedding' and 'full' modes)")
+    embedding_dimension: Optional[int] = Field(None, description="Dimension of embedding vectors")
+    embedding_model: Optional[str] = Field(None, description="Model used for embedding generation")
     
     # Statistics (available in all modes, but content varies)
     word_count: Optional[int] = Field(None, description="Word count of the document")
@@ -123,17 +130,17 @@ class JobResultResponse(BaseModel):
 class DocumentURLRequest(BaseModel):
     url: str = Field(..., description="URL of the document to process")
     output_format: str = Field("json", description="Output format for the processed content")
-    processing_mode: ProcessingMode = Field(ProcessingMode.full, description="Processing mode: 'full' (document only), 'chunks_only' (chunks only), 'both' (document + chunks)")
+    processing_mode: ProcessingMode = Field(ProcessingMode.full, description="Processing mode: 'text_only' (document conversion), 'chunks_only' (chunks only), 'embedding' (embeddings only), 'full' (all features)")
 
 class DocumentURLsBatchRequest(BaseModel):
     urls: List[str] = Field(..., description="List of URLs to process (max 20)")
     output_format: str = Field("json", description="Output format for the processed content")
-    processing_mode: ProcessingMode = Field(ProcessingMode.full, description="Processing mode: 'full' (document only), 'chunks_only' (chunks only), 'both' (document + chunks)")
+    processing_mode: ProcessingMode = Field(ProcessingMode.full, description="Processing mode: 'text_only' (document conversion), 'chunks_only' (chunks only), 'embedding' (embeddings only), 'full' (all features)")
 
 class DocumentCrawlRequest(BaseModel):
     base_url: str = Field(..., description="Starting URL for web crawling")
     max_depth: int = Field(2, description="Maximum crawl depth (1-5 levels)", ge=1, le=5)
     same_domain_only: bool = Field(True, description="Whether to restrict crawling to the same domain")
     output_format: str = Field("json", description="Output format for the processed content")
-    processing_mode: ProcessingMode = Field(ProcessingMode.full, description="Processing mode: 'full' (document only), 'chunks_only' (chunks only), 'both' (document + chunks)")
+    processing_mode: ProcessingMode = Field(ProcessingMode.full, description="Processing mode: 'text_only' (document conversion), 'chunks_only' (chunks only), 'embedding' (embeddings only), 'full' (all features)")
     max_pages: int = Field(50, description="Maximum number of pages to crawl (1-100)", ge=1, le=100)

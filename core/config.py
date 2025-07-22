@@ -28,6 +28,11 @@ class ModelConfig(BaseModel):
     # Tokenizer model directory
     tokenizer_model_dir: Path = Path(os.getenv("TOKENIZER_MODEL_DIR", "models/nomic-embed-text-v1.5"))
     
+    # Embedding configuration
+    embedding_model_path: Path = Field(default_factory=lambda: Path(os.getenv("EMBEDDING_MODEL_PATH", "models/nomic-embed-text-v1.5")))
+    embedding_dimension: int = Field(default_factory=lambda: int(os.getenv("EMBEDDING_DIMENSION", "768")))
+    embedding_batch_size: int = Field(default_factory=lambda: int(os.getenv("EMBEDDING_BATCH_SIZE", "32")))
+    
     # Whisper ASR model directory
     whisper_model_dir: Path = Path(os.getenv("WHISPER_MODEL_DIR", "models/cahya--whisper-medium-id"))
     whisper_model_name: str = os.getenv("WHISPER_MODEL_NAME", "cahya/whisper-medium-id")
@@ -44,6 +49,7 @@ class ModelConfig(BaseModel):
             figure_classifier_model_dir=project_root / "models" / "ds4sd--DocumentFigureClassifier",
             layout_model_dir=project_root / "models" / "ds4sd--docling-models",
             tokenizer_model_dir=project_root / "models" / "nomic-embed-text-v1.5",
+            embedding_model_path=project_root / "models" / "nomic-embed-text-v1.5",
             whisper_model_dir=project_root / "models" / "cahya--whisper-medium-id",
         )
     

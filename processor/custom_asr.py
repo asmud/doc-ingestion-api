@@ -13,7 +13,7 @@ from transformers import (
     AutoProcessor
 )
 import librosa
-from logging_config import get_asr_logger
+from core.logging_config import get_asr_logger
 
 # Module-level logger initialization
 logger = get_asr_logger(__name__)

@@ -4,16 +4,16 @@ import os
 import tempfile
 import time
 from pathlib import Path
-from logging_config import get_processing_logger
-from pipeline import DocumentIntelligencePipeline
-from utils import (
+from core.logging_config import get_processing_logger
+# Remove circular import - will import dynamically when needed
+from utils.utils import (
     get_current_timestamp, 
     handle_processing_error, 
     validate_file_size, 
     validate_file_format,
     is_supported_document_format
 )
-from processing_utils import (
+from utils.processing_utils import (
     get_pipeline,
     process_single_item,
     create_processing_result,
@@ -26,6 +26,7 @@ from processing_utils import (
 logger = get_processing_logger(__name__)
 
 try:
+    from core.pipeline import DocumentIntelligencePipeline
     pipeline = DocumentIntelligencePipeline()
     SUPPORTED_FORMATS = pipeline.get_supported_formats()
 except Exception:
@@ -106,6 +107,8 @@ def _is_originally_txt_file(file_path: str) -> bool:
 def _process_txt_file_directly(file_path: str, output_format: str, processing_mode: str) -> Dict[str, Any]:
     """Process TXT files directly since Docling doesn't support them"""
     try:
+        from core.models import ProcessingMode
+        
         with open(file_path, 'r', encoding='utf-8') as f:
             text_content = f.read()
         
@@ -126,37 +129,54 @@ def _process_txt_file_directly(file_path: str, output_format: str, processing_mo
         word_count = len(text_content.split()) if text_content else 0
         char_count = len(text_content) if text_content else 0
         
-        if processing_mode == "chunks_only":
-            # Create simple chunks for text files
+        result = {
+            "extraction_method": "direct_text",
+            "processing_mode": processing_mode,
+            "word_count": word_count,
+            "char_count": char_count
+        }
+        
+        if processing_mode == ProcessingMode.text_only:
+            # Only text processing and formatting
+            result["content"] = formatted_content
+            result["formatted_content"] = formatted_content
+            
+        elif processing_mode == ProcessingMode.chunks_only:
+            # Only chunking
             chunks = _create_text_chunks(text_content)
-            return {
-                "chunks": chunks,
-                "total_chunks": len(chunks),
-                "word_count": word_count,
-                "char_count": char_count,
-                "extraction_method": "direct_text_chunks_only",
-                "processing_mode": processing_mode
-            }
-        elif processing_mode == "both":
+            result["chunks"] = chunks
+            result["total_chunks"] = len(chunks)
+            
+        elif processing_mode == ProcessingMode.embedding:
+            # For embedding mode with TXT files, we need to create a simple DoclingDocument-like structure
+            # Since we can't use the embedding service directly with plain text, we'll simulate it
             chunks = _create_text_chunks(text_content)
-            return {
-                "content": formatted_content,
-                "formatted_content": formatted_content,
-                "chunks": chunks,
-                "total_chunks": len(chunks),
-                "word_count": word_count,
-                "char_count": char_count,
-                "extraction_method": "direct_text_full_and_chunks",
-                "processing_mode": processing_mode
-            }
-        else:  # full
-            return {
-                "content": formatted_content,
-                "word_count": word_count,
-                "char_count": char_count,
-                "extraction_method": "direct_text_full",
-                "processing_mode": processing_mode
-            }
+            
+            # Note: For TXT files, we can't generate embeddings without the full pipeline
+            # This would need to be handled specially or TXT files could be excluded from embedding mode
+            logger.warning("Embedding mode not fully supported for TXT files - requires Docling pipeline")
+            result["chunks"] = chunks
+            result["total_chunks"] = len(chunks)
+            result["embedding_note"] = "Embedding generation not available for plain text files"
+            
+        elif processing_mode == ProcessingMode.full:
+            # All features
+            result["content"] = formatted_content
+            result["formatted_content"] = formatted_content
+            
+            chunks = _create_text_chunks(text_content)
+            result["chunks"] = chunks
+            result["total_chunks"] = len(chunks)
+            
+            # Note: Same embedding limitation for TXT files
+            logger.warning("Embedding mode not fully supported for TXT files in full mode")
+            result["embedding_note"] = "Embedding generation not available for plain text files"
+            
+        else:
+            raise ValueError(f"Unsupported processing mode: {processing_mode}")
+            
+        return result
+        
     except Exception as e:
         logger.error(f"Error processing TXT file directly: {e}")
         raise ValueError(f"Failed to process TXT file: {str(e)}")
@@ -244,7 +264,7 @@ def _process_with_docling(file_path: str, output_format: str = "json", processin
     Args:
         file_path: Path to the file
         output_format: Format for output ("json", "markdown", "text", "html")
-        processing_mode: Processing mode ("full", "chunks_only", "both")
+        processing_mode: Processing mode ("text_only", "chunks_only", "embedding", "full")
         
     Returns:
         Processed document data
@@ -253,80 +273,9 @@ def _process_with_docling(file_path: str, output_format: str = "json", processin
         # Check if this is a TXT file that we need to handle separately
         if file_path.lower().endswith('.md') and _is_originally_txt_file(file_path):
             return _process_txt_file_directly(file_path, output_format, processing_mode)
-        if processing_mode == "chunks_only":
-            # Only process and chunk the document, skip formatted content
-            chunks = pipeline.process_and_chunk_document(file_path)
-            
-            # Get statistics from chunks
-            total_text = " ".join([chunk.get("text", "") for chunk in chunks])
-            word_count = len(total_text.split()) if total_text else 0
-            char_count = len(total_text) if total_text else 0
-            
-            return {
-                "chunks": chunks,
-                "total_chunks": len(chunks),
-                "word_count": word_count,
-                "char_count": char_count,
-                "extraction_method": "docling_chunks_only",
-                "processing_mode": processing_mode
-            }
-            
-        elif processing_mode == "both":
-            # Process document fully AND chunk it
-            chunks = pipeline.process_and_chunk_document(file_path)
-            formatted_content = pipeline.process_and_format_document(file_path, output_format)
-            
-            # Get statistics from formatted content
-            if output_format == "text":
-                text_content = formatted_content
-                word_count = len(text_content.split()) if isinstance(text_content, str) else 0
-                char_count = len(text_content) if isinstance(text_content, str) else 0
-            else:
-                try:
-                    text_content = pipeline.process_and_format_document(file_path, "text")
-                    word_count = len(text_content.split()) if isinstance(text_content, str) else 0
-                    char_count = len(text_content) if isinstance(text_content, str) else 0
-                except:
-                    word_count = 0
-                    char_count = 0
-            
-            return {
-                "content": formatted_content,
-                "formatted_content": formatted_content,
-                "chunks": chunks,
-                "total_chunks": len(chunks),
-                "word_count": word_count,
-                "char_count": char_count,
-                "extraction_method": "docling_full_and_chunks",
-                "processing_mode": processing_mode
-            }
-            
-        else:  # processing_mode == "full"
-            # Just process and format the document (default behavior)
-            formatted_content = pipeline.process_and_format_document(file_path, output_format)
-            
-            # Get basic statistics
-            if output_format == "text":
-                text_content = formatted_content
-                word_count = len(text_content.split()) if isinstance(text_content, str) else 0
-                char_count = len(text_content) if isinstance(text_content, str) else 0
-            else:
-                # For other formats, try to extract text for statistics
-                try:
-                    text_content = pipeline.process_and_format_document(file_path, "text")
-                    word_count = len(text_content.split()) if isinstance(text_content, str) else 0
-                    char_count = len(text_content) if isinstance(text_content, str) else 0
-                except:
-                    word_count = 0
-                    char_count = 0
-            
-            return {
-                "content": formatted_content,
-                "word_count": word_count,
-                "char_count": char_count,
-                "extraction_method": "docling_full",
-                "processing_mode": processing_mode
-            }
+        
+        # Use the new mode-based processing from pipeline
+        return pipeline.process_document_with_mode(file_path, processing_mode, output_format)
             
     except Exception as e:
         logger.error(f"Error in Docling processing: {e}")

@@ -6,8 +6,8 @@ import sys
 import warnings
 import uvicorn
 from dotenv import load_dotenv
-from logging_config import setup_logging
-from app import app, cleanup_resources
+from core.logging_config import setup_logging
+from core.app import app, cleanup_resources
 import logging
 
 load_dotenv()
@@ -35,7 +35,7 @@ def main():
     
     try:
         uvicorn.run(
-            "app:app",
+            "core.app:app",
             host=host,
             port=port,
             reload=reload,

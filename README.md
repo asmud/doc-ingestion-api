@@ -7,10 +7,12 @@ A high-performance FastAPI-based document processing service that extracts and s
 - **Multi-format Support**: PDF, DOCX, PPTX, XLSX, HTML, TXT, CSV, MD, AUDIO
 - **Advanced OCR**: Indonesian + English support via EasyOCR and Tesseract
 - **Intelligent Processing**: Layout detection, figure classification, formula recognition
+- **Semantic Embeddings**: Document and chunk-level embeddings using nomic-embed-text-v1.5
 - **Flexible Output**: JSON, Markdown, Text, HTML formats
 - **Async Processing**: Background jobs with Celery and Redis
 - **Web Crawling**: Recursive website processing with depth control
 - **Smart Chunking**: Semantic text segmentation for RAG applications
+- **Modular Architecture**: Clean separation of core, processor, and utility modules
 
 ## Quick Start
 
@@ -63,9 +65,10 @@ curl -X POST "http://localhost:8000/process/urls/crawl/async" \
 
 ## Processing Modes
 
-- **`full`**: Complete document processing with formatted output
+- **`text_only`**: Document conversion and formatting only (text extraction)
 - **`chunks_only`**: Fast chunking for RAG applications (optimized for vector databases)
-- **`both`**: Full processing + chunking for comprehensive analysis
+- **`embedding`**: Generate document-level and chunk-level embeddings using nomic-embed-text
+- **`full`**: All features - text conversion, chunking, and embedding generation (comprehensive)
 
 ## Configuration
 
@@ -79,8 +82,10 @@ DEVICE=cpu                    # cpu, cuda, or mps
 DEFAULT_OCR_ENGINE=easyocr    # easyocr or tesseract
 
 # Processing parameters  
-CHUNK_SIZE=6500              # Tokens per chunk
-PROCESSING_MODE=full         # full, chunks_only, both
+CHUNK_SIZE=200               # Tokens per chunk
+PROCESSING_MODE=full         # text_only, chunks_only, embedding, full
+EMBEDDING_DIMENSION=768      # Embedding vector size
+EMBEDDING_BATCH_SIZE=32      # Batch size for embeddings
 
 # Redis connection
 CELERY_BROKER_URL=redis://localhost:6379/9
@@ -88,10 +93,33 @@ CELERY_BROKER_URL=redis://localhost:6379/9
 
 ## Architecture
 
+```
+doc-intelligence/
+├── main.py              # Application entry point
+├── core/                # Core application logic
+│   ├── app.py          # FastAPI configuration
+│   ├── api.py          # REST API endpoints
+│   ├── pipeline.py     # Document processing pipeline
+│   ├── models.py       # Pydantic models
+│   └── config.py       # Configuration management
+├── processor/           # Document processing modules
+│   ├── doc.py          # File upload processing
+│   ├── web.py          # URL/web crawling
+│   ├── custom_asr.py   # Audio processing
+│   └── embedding.py    # Semantic embeddings
+├── utils/               # Shared utilities
+│   ├── utils.py        # Common functions
+│   ├── processing_utils.py  # Processing helpers
+│   └── job_manager.py  # Background job management
+└── docs/               # Documentation
+```
+
+**Technology Stack:**
 - **FastAPI**: REST API with async support
 - **Celery**: Background task processing
 - **Redis**: Job queue and result storage
 - **Docling**: IBM's document AI pipeline
+- **nomic-embed-text**: Semantic embeddings
 - **Local Models**: No external API dependencies
 
 ## Documentation

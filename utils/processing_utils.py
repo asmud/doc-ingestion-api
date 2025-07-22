@@ -5,9 +5,9 @@ This module provides common processing patterns and pipeline management.
 
 from typing import Dict, Any, Optional, List
 from pathlib import Path
-from logging_config import get_processing_logger
-from pipeline import DocumentIntelligencePipeline
-from utils import get_current_timestamp, handle_processing_error
+from core.logging_config import get_processing_logger
+from core.pipeline import DocumentIntelligencePipeline
+from utils.utils import get_current_timestamp, handle_processing_error
 
 logger = get_processing_logger(__name__)
 
@@ -122,7 +122,7 @@ def cleanup_temp_file(file_path: str) -> None:
 
 def validate_processing_mode(mode: str) -> str:
     """Validate and normalize processing mode."""
-    valid_modes = {"full", "chunks_only", "both"}
+    valid_modes = {"text_only", "chunks_only", "embedding", "full"}
     
     if mode not in valid_modes:
         raise ValueError(f"Invalid processing mode '{mode}'. Must be one of: {', '.join(valid_modes)}")

@@ -1,4 +1,4 @@
-from .pipeline import DocumentIntelligencePipeline
-from .config import ModelConfig
+from .core.pipeline import DocumentIntelligencePipeline
+from .core.config import ModelConfig
 
 __all__ = ["DocumentIntelligencePipeline", "ModelConfig"]

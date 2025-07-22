@@ -97,7 +97,7 @@ def cleanup_resources():
         
         # Clean up pipeline resources
         try:
-            from pipeline import DocumentIntelligencePipeline
+            from core.pipeline import DocumentIntelligencePipeline
             if hasattr(DocumentIntelligencePipeline, '_instance'):
                 pipeline = DocumentIntelligencePipeline._instance
                 if pipeline and hasattr(pipeline, 'cleanup'):
@@ -121,9 +121,9 @@ async def startup_tasks():
     global celery_worker_process, worker_thread
     
     try:
-        from celery_app import celery_app
-        from job_manager import init_job_manager
-        from logging_config import setup_logging, get_logging_config
+        from core.celery_app import celery_app
+        from utils.job_manager import init_job_manager
+        from core.logging_config import setup_logging, get_logging_config
         
         # Setup server logging
         setup_logging("server")
@@ -168,4 +168,4 @@ async def startup_tasks():
 
 
 # Include API routes
-import api
+import core.api as api

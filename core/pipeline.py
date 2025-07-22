@@ -9,9 +9,10 @@ from docling.backend.pypdfium2_backend import PyPdfiumDocumentBackend
 from docling_core.types.doc.document import DoclingDocument
 from docling_core.transforms.chunker.hybrid_chunker import HybridChunker
 from docling_core.transforms.chunker.tokenizer.huggingface import HuggingFaceTokenizer
-from config import ModelConfig
-from custom_asr import process_indonesian_audio
-from logging_config import get_pipeline_logger
+from core.config import ModelConfig
+from processor.custom_asr import process_indonesian_audio
+from core.logging_config import get_pipeline_logger
+from processor.embedding import EmbeddingService
 
 logger = get_pipeline_logger(__name__)
 
@@ -21,6 +22,7 @@ class DocumentIntelligencePipeline:
         self.config.validate_models_exist()
         self._setup_environment_variables()
         self._setup_pipeline()
+        self._setup_embedding_service()
     
     def _setup_environment_variables(self):
         os.environ['EASYOCR_MODEL_DIR'] = str(self.config.easyocr_models_dir)
@@ -112,6 +114,18 @@ class DocumentIntelligencePipeline:
                 print(f"⚠️ Warning: All ASR configurations failed, using system default: {e2}")
         
         self.converter = DocumentConverter(format_options=format_options)
+    
+    def _setup_embedding_service(self):
+        """Initialize the embedding service."""
+        try:
+            self.embedding_service = EmbeddingService(
+                tokenizer_path=str(self.config.embedding_model_path),
+                device=self.config.device
+            )
+            logger.info("Embedding service initialized successfully")
+        except Exception as e:
+            logger.warning(f"Failed to initialize embedding service: {e}")
+            self.embedding_service = None
     
     def _is_audio_file(self, file_path: Union[str, Path]) -> bool:
         """Check if file is an audio file."""
@@ -298,6 +312,105 @@ class DocumentIntelligencePipeline:
         
         return chunk_list
     
+    def generate_embeddings(self, document: DoclingDocument, chunks: Optional[List[Dict[str, Any]]] = None) -> Dict[str, Any]:
+        """
+        Generate document-level and chunk-level embeddings.
+        
+        Args:
+            document: DoclingDocument to embed
+            chunks: Optional pre-computed chunks. If None, chunks will be generated.
+            
+        Returns:
+            Dictionary containing embedding data
+        """
+        if not self.embedding_service:
+            raise RuntimeError("Embedding service not available. Check initialization logs.")
+        
+        try:
+            # Generate chunks if not provided
+            if chunks is None:
+                chunks = self.chunk_document(document)
+            
+            # Generate embeddings
+            doc_embedding, chunk_embeddings = self.embedding_service.generate_embeddings(document, chunks)
+            
+            # Get model info
+            model_info = self.embedding_service.get_model_info()
+            
+            return {
+                "document_embedding": doc_embedding,
+                "chunk_embeddings": chunk_embeddings,
+                "embedding_dimension": model_info["embedding_dimension"],
+                "embedding_model": model_info["model_name"],
+                "total_chunks": len(chunks)
+            }
+            
+        except Exception as e:
+            logger.error(f"Failed to generate embeddings: {e}")
+            raise
+    
+    def process_document_with_mode(self, document_path: Union[str, Path], mode: str, output_format: str = "json") -> Dict[str, Any]:
+        """
+        Process document with specified mode.
+        
+        Args:
+            document_path: Path to document
+            mode: Processing mode ('text_only', 'chunks_only', 'embedding', 'full')
+            output_format: Output format for text content
+            
+        Returns:
+            Dictionary containing processed content based on mode
+        """
+        from core.models import ProcessingMode
+        
+        document = self.process_document(document_path)
+        result = {
+            "extraction_method": "docling",
+            "processing_mode": mode
+        }
+        
+        # Text statistics (available for all modes)
+        text_content = document.export_to_text()
+        result["word_count"] = len(text_content.split()) if text_content else 0
+        result["char_count"] = len(text_content) if text_content else 0
+        
+        if mode == ProcessingMode.text_only:
+            # Only text processing and formatting
+            result["content"] = self.format_document(document, output_format)
+            result["formatted_content"] = self.format_document(document, output_format)
+            
+        elif mode == ProcessingMode.chunks_only:
+            # Only chunking
+            chunks = self.chunk_document(document)
+            result["chunks"] = chunks
+            result["total_chunks"] = len(chunks)
+            
+        elif mode == ProcessingMode.embedding:
+            # Only embedding generation
+            chunks = self.chunk_document(document)  # Need chunks for chunk-level embeddings
+            embedding_data = self.generate_embeddings(document, chunks)
+            result.update(embedding_data)
+            
+        elif mode == ProcessingMode.full:
+            # All features: text_only + chunks_only + embedding
+            # Text processing
+            result["content"] = self.format_document(document, output_format)
+            result["formatted_content"] = self.format_document(document, output_format)
+            
+            # Chunking
+            chunks = self.chunk_document(document)
+            result["chunks"] = chunks
+            result["total_chunks"] = len(chunks)
+            
+            # Embedding
+            embedding_data = self.generate_embeddings(document, chunks)
+            result.update(embedding_data)
+            
+        else:
+            raise ValueError(f"Unsupported processing mode: {mode}")
+        
+        return result
+    
     def process_and_chunk_document(self, document_path: Union[str, Path], chunk_size: Optional[int] = None, overlap: Optional[int] = None, tokenizer_name: Optional[str] = None) -> List[Dict[str, Any]]:
         document = self.process_document(document_path)
         return self.chunk_document(document, chunk_size, overlap, tokenizer_name)
@@ -332,6 +445,12 @@ class DocumentIntelligencePipeline:
                 "chunk_overlap": self.config.chunk_overlap,
                 "merge_peers": self.config.merge_peers,
                 "tokenizer_model": str(self.config.tokenizer_model_dir)
+            },
+            "embedding": {
+                "model_path": str(self.config.embedding_model_path),
+                "embedding_dimension": self.config.embedding_dimension,
+                "batch_size": self.config.embedding_batch_size,
+                "service_available": self.embedding_service is not None
             }
         }
         

@@ -30,7 +30,7 @@ graph TB
 
 ### 1. API Layer (FastAPI)
 
-**Location**: `app.py`, `api.py`
+**Location**: `core/app.py`, `core/api.py`
 
 **Responsibilities:**
 - HTTP request handling and routing
@@ -56,7 +56,7 @@ graph TB
 
 ### 2. Document Processing Pipeline
 
-**Location**: `pipeline.py`
+**Location**: `core/pipeline.py`
 
 **Responsibilities:**
 - Document format detection and conversion
@@ -76,13 +76,14 @@ class DocumentIntelligencePipeline:
 ```
 
 **Processing Modes:**
-- **Full**: Complete document processing with formatted output
-- **Chunks Only**: Fast chunking for RAG applications
-- **Both**: Comprehensive processing with full output + chunks
+- **Text Only**: Document conversion and formatting only (text extraction)
+- **Chunks Only**: Fast chunking for RAG applications (optimized for vector databases)
+- **Embedding**: Generate document-level and chunk-level embeddings using nomic-embed-text
+- **Full**: All features - text conversion, chunking, and embedding generation
 
 ### 3. Background Processing (Celery)
 
-**Location**: `celery_app.py`
+**Location**: `core/celery_app.py`
 
 **Responsibilities:**
 - Asynchronous task execution
