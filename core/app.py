@@ -142,7 +142,7 @@ async def startup_tasks():
                     celery_log_level = logging_config.get_celery_log_level_string()
                     
                     worker_cmd = [
-                        "celery", "-A", "celery_app", "worker",
+                        "celery", "-A", "core.celery_app", "worker",
                         f"--loglevel={celery_log_level}", "--concurrency=2",
                         "--queues=documents,batch,crawl"
                     ]
