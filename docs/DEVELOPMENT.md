@@ -158,11 +158,11 @@ grep "WARNING" logs/app.log
 # Check model directory
 ls -la models/
 
-# Test model loading directly
+# Test ONNX model loading directly
 python -c "
-from pipeline import DocumentIntelligencePipeline
+from core.pipeline import DocumentIntelligencePipeline
 pipeline = DocumentIntelligencePipeline()
-print('✅ Pipeline initialized successfully')
+print('✅ ONNX Pipeline initialized successfully')
 "
 
 # Clear model cache
@@ -406,9 +406,9 @@ DEVICE=cuda  # If GPU available
 ### Model Management
 
 ```bash
-# Download models for offline development
+# Download ONNX models for offline development
 TRANSFORMERS_OFFLINE=False python -c "
-from pipeline import DocumentIntelligencePipeline
+from core.pipeline import DocumentIntelligencePipeline
 DocumentIntelligencePipeline()
 "
 

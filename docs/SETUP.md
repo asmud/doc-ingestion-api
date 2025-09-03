@@ -8,8 +8,8 @@ This guide provides detailed instructions for installing and configuring the Doc
 
 - **Python**: 3.8 or higher (3.11 recommended)
 - **Redis**: 6.0 or higher (required for background job processing)
-- **Memory**: 8GB+ RAM recommended (4GB minimum)
-- **Storage**: 10GB+ free space for models and processing
+- **Memory**: 8GB+ RAM recommended (4GB minimum, ONNX models use less memory)
+- **Storage**: 8GB+ free space for ONNX models and processing (reduced from 10GB)
 
 ### Platform Support
 
@@ -52,7 +52,7 @@ conda activate doc-ingestion
 ### 3. Install Dependencies
 
 ```bash
-# Install Python dependencies
+# Install Python dependencies (includes ONNX Runtime)
 pip install -r requirements.txt
 
 # Install as development package (optional)
@@ -157,45 +157,45 @@ CORS_CREDENTIALS=true
 
 ### 3. Model Setup
 
-The application uses several local models that need to be downloaded:
+The application uses several local ONNX models that need to be downloaded:
 
-#### Automatic Model Download
-Models will be automatically downloaded on first use if they don't exist locally:
+#### Automatic ONNX Model Download
+ONNX models will be automatically downloaded on first use if they don't exist locally:
 
 ```bash
-# Start the application - models will download automatically
+# Start the application - ONNX models will download automatically
 python main.py
 ```
 
-#### Manual Model Setup
-For offline environments or faster startup, download models manually:
+#### Manual ONNX Model Setup
+For offline environments or faster startup, download ONNX models manually:
 
 ```bash
 # Create models directory
 mkdir -p models
 
-# Download required models (this may take time)
+# Download required ONNX models (this may take time)
 python -c "
 import os
 os.environ['TRANSFORMERS_OFFLINE'] = 'False'
-from pipeline import DocumentIntelligencePipeline
+from core.pipeline import DocumentIntelligencePipeline
 pipeline = DocumentIntelligencePipeline()
-print('Models downloaded successfully')
+print('ONNX models downloaded successfully')
 "
 ```
 
-#### Model Storage Locations
+#### ONNX Model Storage Locations
 
-Models are stored in the `models/` directory:
+ONNX models are stored in the `models/` directory:
 
 ```
 models/
-├── EasyOcr/                    # OCR models (Indonesian + English)
-├── ds4sd--docling-models/      # Layout detection models
-├── ds4sd--DocumentFigureClassifier/  # Figure classification
-├── ds4sd--CodeFormula/         # Formula detection
-├── nomic-embed-text-v1.5/     # Text embedding (for chunking)
-└── cahya--whisper-medium-id/   # Indonesian ASR model
+├── EasyOcr-onnx/                           # ONNX OCR models (Indonesian + English)
+├── asmud--ds4sd-docling-models-onnx/      # ONNX Layout detection models
+├── asmud--ds4sd-DocumentClassifier-onnx/  # ONNX Figure classification
+├── asmud--ds4sd-CodeFormula-onnx/          # ONNX Formula detection
+├── asmud--LazarusNLP-indobert-onnx/        # Indonesian BERT embedding (ONNX)
+└── asmud--cahya-whisper-medium-onnx/       # ONNX Indonesian ASR model
 ```
 
 ## Starting the Application
@@ -301,31 +301,33 @@ Error: Model not found or download failed
 ```
 **Solutions:**
 ```bash
-# Clear model cache
+# Clear ONNX model cache
 rm -rf models/
 rm -rf ~/.cache/huggingface/
 
 # Retry with internet connection
 TRANSFORMERS_OFFLINE=False python main.py
 
-# Or download specific model manually
-python -c "from transformers import AutoModel; AutoModel.from_pretrained('ds4sd/docling-models')"
+# Or download specific ONNX model manually
+python -c "from transformers import AutoModel; AutoModel.from_pretrained('asmud/ds4sd-docling-models-onnx')"
 ```
 
 #### Memory Issues
 ```
 Error: CUDA out of memory / Killed (OOM)
 ```
-**Solutions:**
+**Solutions (ONNX uses less memory):**
 ```bash
-# Force CPU usage
+# Force CPU usage (ONNX CPU is quite fast)
 echo "DEVICE=cpu" >> .env
 
 # Reduce chunk size
-echo "CHUNK_SIZE=1000" >> .env
+echo "CHUNK_SIZE=200" >> .env  # Optimized for Indonesian BERT
 
 # Reduce worker concurrency
 celery -A celery_app worker --concurrency=1
+
+# ONNX models use ~40% less memory than PyTorch
 ```
 
 #### Permission Issues (Linux)
@@ -363,29 +365,33 @@ echo "SERVER_LOG_LEVEL=debug" >> .env
 
 ### Performance Tuning
 
-#### For High Throughput
+#### For High Throughput (ONNX Optimized)
 ```env
-# Increase worker concurrency
+# Increase worker concurrency (ONNX handles better)
 CELERY_WORKER_CONCURRENCY=4
 
 # Use multiple server workers (production)
 SERVER_WORKERS=4
 
-# Optimize chunking
-CHUNK_SIZE=1000
-CHUNK_OVERLAP=100
+# Optimize chunking for Indonesian BERT
+CHUNK_SIZE=200
+CHUNK_OVERLAP=20
+
+# ONNX provides 2-3x performance boost
 ```
 
-#### For Low Memory Systems
+#### For Low Memory Systems (ONNX Benefits)
 ```env
-# Force CPU processing
+# Force CPU processing (ONNX CPU is fast)
 DEVICE=cpu
 
-# Reduce chunk size
-CHUNK_SIZE=500
+# Use smaller chunk size
+CHUNK_SIZE=100
 
 # Single worker
 CELERY_WORKER_CONCURRENCY=1
+
+# ONNX uses 40% less memory than PyTorch
 ```
 
 ## Next Steps

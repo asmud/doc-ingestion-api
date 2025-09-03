@@ -73,7 +73,7 @@ curl -X GET "http://localhost:8000/formats"
 
 - **`text_only`**: Document conversion and formatting only (text extraction)
 - **`chunks_only`**: Document chunking without full formatting (faster, optimized for RAG)
-- **`embedding`**: Generate document-level and chunk-level embeddings using nomic-embed-text-v1.5
+- **`embedding`**: Generate document-level and chunk-level embeddings using Indonesian BERT ONNX
 - **`full`**: All features - text conversion, chunking, and embedding generation (comprehensive, default)
 
 ### Output Formats
@@ -98,8 +98,8 @@ This allows you to:
 
 - **`document_embedding`**: 768-dimensional vector representing the entire document
 - **`embedding_dimension`**: Size of embedding vectors (768)
-- **`embedding_model`**: Model used for embeddings ("nomic-embed-text-v1.5")
-- **`chunks[].embedding`**: 768-dimensional vector for each individual chunk
+- **`embedding_model`**: Model used for embeddings ("LazarusNLP-indobert-onnx")
+- **`chunks[].embedding`**: 768-dimensional vector for each individual chunk (Indonesian/English optimized)
 
 ### POST /process/upload
 
@@ -148,7 +148,7 @@ curl -X POST "http://localhost:8000/process/upload" \
     "total_chunks": 3,
     "document_embedding": [0.05, -0.12, 0.08, ...],  // 768-dimensional vector
     "embedding_dimension": 768,
-    "embedding_model": "nomic-embed-text-v1.5",
+    "embedding_model": "LazarusNLP-indobert-onnx",
     "word_count": 1250,
     "char_count": 8456,
     "extraction_method": "docling",

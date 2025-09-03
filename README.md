@@ -7,7 +7,7 @@ A high-performance FastAPI-based document processing service that extracts and s
 - **Multi-format Support**: PDF, DOCX, PPTX, XLSX, HTML, TXT, CSV, MD, AUDIO
 - **Advanced OCR**: Indonesian + English support via EasyOCR and Tesseract
 - **Intelligent Processing**: Layout detection, figure classification, formula recognition
-- **Semantic Embeddings**: Document and chunk-level embeddings using nomic-embed-text-v1.5
+- **Semantic Embeddings**: Document and chunk-level embeddings using Indonesian BERT (ONNX optimized)
 - **Flexible Output**: JSON, Markdown, Text, HTML formats
 - **Async Processing**: Background jobs with Celery and Redis
 - **Web Crawling**: Recursive website processing with depth control
@@ -67,7 +67,7 @@ curl -X POST "http://localhost:8000/process/urls/crawl/async" \
 
 - **`text_only`**: Document conversion and formatting only (text extraction)
 - **`chunks_only`**: Fast chunking for RAG applications (optimized for vector databases)
-- **`embedding`**: Generate document-level and chunk-level embeddings using nomic-embed-text-v1.5
+- **`embedding`**: Generate document-level and chunk-level embeddings using Indonesian BERT ONNX
 - **`full`**: All features - text conversion, chunking, and embedding generation (comprehensive)
 
 ## Content Fields
@@ -94,8 +94,8 @@ DEFAULT_OCR_ENGINE=easyocr    # easyocr or tesseract
 # Processing parameters  
 CHUNK_SIZE=200               # Tokens per chunk
 PROCESSING_MODE=full         # text_only, chunks_only, embedding, full
-EMBEDDING_DIMENSION=768      # Embedding vector size
-EMBEDDING_BATCH_SIZE=32      # Batch size for embeddings
+EMBEDDING_DIMENSION=768      # Indonesian BERT embedding vector size
+EMBEDDING_BATCH_SIZE=32      # Batch size for ONNX embeddings
 
 # Redis connection
 CELERY_BROKER_URL=redis://localhost:6379/9
@@ -129,8 +129,9 @@ doc-intelligence/
 - **Celery**: Background task processing
 - **Redis**: Job queue and result storage
 - **Docling**: IBM's document AI pipeline
-- **nomic-embed-text**: Semantic embeddings
-- **Local Models**: No external API dependencies
+- **ONNX Runtime**: Optimized model inference
+- **Indonesian BERT**: Semantic embeddings for Indonesian/English
+- **Local ONNX Models**: Faster inference, no external API dependencies
 
 ## Documentation
 
@@ -144,8 +145,8 @@ doc-intelligence/
 ## System Requirements
 
 - **Python**: 3.8+ (3.11 recommended)
-- **Memory**: 8GB+ RAM (models require ~3GB)
-- **Storage**: 10GB+ for models and processing
+- **Memory**: 8GB+ RAM (ONNX models require ~2GB, reduced from PyTorch)
+- **Storage**: 8GB+ for ONNX models and processing (reduced storage footprint)
 - **Redis**: 6.0+ for background jobs
 
 ## License

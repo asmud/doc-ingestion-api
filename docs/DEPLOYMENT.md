@@ -724,15 +724,16 @@ echo "vm.max_map_count = 262144" >> /etc/sysctl.conf
 sysctl -p
 ```
 
-### Application Optimization
+### Application Optimization (ONNX Benefits)
 
 ```env
-# Production environment settings
+# Production environment settings (ONNX optimized)
 SERVER_WORKERS=4
 CELERY_WORKER_CONCURRENCY=4
-CHUNK_SIZE=2000
-CHUNK_OVERLAP=200
-DEVICE=cuda  # If GPU available
+CHUNK_SIZE=200  # Optimized for Indonesian BERT
+CHUNK_OVERLAP=20
+DEVICE=cuda  # If GPU available, ONNX provides excellent acceleration
+# ONNX models provide 2-3x performance boost
 ```
 
 For more information, see:
