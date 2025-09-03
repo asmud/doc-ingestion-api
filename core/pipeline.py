@@ -241,8 +241,8 @@ class DocumentIntelligencePipeline:
         tokenizer_path = tokenizer_name or str(self.config.tokenizer_model_dir)
         
         from transformers import AutoTokenizer
-        actual_model_path = Path(tokenizer_path) / "snapshots" / "f752c1ee2994831dcef5b1e446383bc1e1996d52"
-        hf_tokenizer = AutoTokenizer.from_pretrained(str(actual_model_path))
+        # For ONNX models, use the tokenizer_path directly without snapshots subdirectory
+        hf_tokenizer = AutoTokenizer.from_pretrained(str(tokenizer_path))
         
         tokenizer = HuggingFaceTokenizer(tokenizer=hf_tokenizer, max_tokens=chunk_size)
         chunker = HybridChunker(tokenizer=tokenizer, merge_peers=self.config.merge_peers)

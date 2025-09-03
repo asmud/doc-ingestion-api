@@ -22,35 +22,43 @@ class ModelConfig(BaseModel):
     # Chunking configuration - use Field with default_factory to read env at runtime
     chunk_size: int = Field(default_factory=lambda: int(os.getenv("CHUNK_SIZE", "200")))
     chunk_overlap: int = Field(default_factory=lambda: int(os.getenv("CHUNK_OVERLAP", "20")))
-    chunker_tokenizer: str = Field(default_factory=lambda: os.getenv("CHUNKER_TOKENIZER", "models/nomic-embed-text-v1.5"))
+    chunker_tokenizer: str = Field(default_factory=lambda: os.getenv("CHUNKER_TOKENIZER", "models/asmud--LazarusNLP-indobert-onnx"))
     merge_peers: bool = Field(default_factory=lambda: os.getenv("MERGE_PEERS", "True").lower() in ("true", "1", "yes"))
     
     # Tokenizer model directory
-    tokenizer_model_dir: Path = Path(os.getenv("TOKENIZER_MODEL_DIR", "models/nomic-embed-text-v1.5"))
+    tokenizer_model_dir: Path = Path(os.getenv("TOKENIZER_MODEL_DIR", "models/asmud--LazarusNLP-indobert-onnx"))
     
     # Embedding configuration
-    embedding_model_path: Path = Field(default_factory=lambda: Path(os.getenv("EMBEDDING_MODEL_PATH", "models/nomic-embed-text-v1.5")))
+    embedding_model_path: Path = Field(default_factory=lambda: Path(os.getenv("EMBEDDING_MODEL_PATH", "models/asmud--LazarusNLP-indobert-onnx")))
     embedding_dimension: int = Field(default_factory=lambda: int(os.getenv("EMBEDDING_DIMENSION", "768")))
     embedding_batch_size: int = Field(default_factory=lambda: int(os.getenv("EMBEDDING_BATCH_SIZE", "32")))
     
     # Whisper ASR model directory
-    whisper_model_dir: Path = Path(os.getenv("WHISPER_MODEL_DIR", "models/cahya--whisper-medium-id"))
-    whisper_model_name: str = os.getenv("WHISPER_MODEL_NAME", "cahya/whisper-medium-id")
+    whisper_model_dir: Path = Path(os.getenv("WHISPER_MODEL_DIR", "models/asmud--cahya-whisper-medium-onnx"))
+    whisper_model_name: str = os.getenv("WHISPER_MODEL_NAME", "asmud/cahya-whisper-medium-onnx")
     
     @classmethod
     def from_project_root(cls, project_root: Optional[Path] = None) -> "ModelConfig":
         if project_root is None:
             project_root = Path.cwd()
         
+        # Get embedding model path from env var or use default
+        embedding_path = os.getenv("EMBEDDING_MODEL_PATH")
+        if embedding_path:
+            # If it's a relative path, make it relative to project root
+            embedding_model_path = Path(embedding_path) if Path(embedding_path).is_absolute() else project_root / embedding_path
+        else:
+            embedding_model_path = project_root / "models" / "asmud--LazarusNLP-indobert-onnx"
+        
         return cls(
             models_dir=project_root / "models",
-            easyocr_models_dir=project_root / "models" / "EasyOcr",
-            code_formula_model_dir=project_root / "models" / "ds4sd--CodeFormula",
-            figure_classifier_model_dir=project_root / "models" / "ds4sd--DocumentFigureClassifier",
-            layout_model_dir=project_root / "models" / "ds4sd--docling-models",
-            tokenizer_model_dir=project_root / "models" / "nomic-embed-text-v1.5",
-            embedding_model_path=project_root / "models" / "nomic-embed-text-v1.5",
-            whisper_model_dir=project_root / "models" / "cahya--whisper-medium-id",
+            easyocr_models_dir=project_root / "models" / "EasyOcr-onnx",
+            code_formula_model_dir=project_root / "models" / "asmud--ds4sd-CodeFormula-onnx",
+            figure_classifier_model_dir=project_root / "models" / "asmud--ds4sd-DocumentClassifier-onnx",
+            layout_model_dir=project_root / "models" / "asmud--ds4sd-docling-models-onnx",
+            tokenizer_model_dir=project_root / "models" / "asmud--LazarusNLP-indobert-onnx",
+            embedding_model_path=embedding_model_path,
+            whisper_model_dir=project_root / "models" / "asmud--cahya-whisper-medium-onnx",
         )
     
     def validate_models_exist(self) -> bool:

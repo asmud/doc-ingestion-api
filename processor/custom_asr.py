@@ -1,6 +1,6 @@
 """
 Custom ASR processor for Whisper model integration.
-This module provides direct integration with local Whisper models using the transformers library,
+This module provides direct integration with local Whisper ONNX models,
 bypassing Docling's built-in ASR limitations.
 """
 
@@ -8,10 +8,7 @@ import torch
 import warnings
 from pathlib import Path
 from typing import Optional, Dict, Any, List
-from transformers import (
-    AutoModelForSpeechSeq2Seq,
-    AutoProcessor
-)
+import numpy as np
 import librosa
 from core.logging_config import get_asr_logger
 

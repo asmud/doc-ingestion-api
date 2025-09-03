@@ -1,5 +1,5 @@
 """
-Embedding service for generating document and chunk-level embeddings using the nomic-embed-text model.
+Embedding service for generating document and chunk-level embeddings using ONNX Runtime.
 """
 
 import os
@@ -12,44 +12,109 @@ from docling_core.types.doc.document import DoclingDocument
 logger = logging.getLogger(__name__)
 
 class EmbeddingService:
-    """Service for generating embeddings using the local nomic-embed-text model."""
+    """Service for generating embeddings using ONNX Runtime with Indonesian BERT model."""
     
     def __init__(self, tokenizer_path: str, device: str = "cpu"):
         """
         Initialize the embedding service.
         
         Args:
-            tokenizer_path: Path to the nomic tokenizer model
+            tokenizer_path: Path to the ONNX tokenizer model
             device: Device to run the model on (cpu/cuda)
         """
         self.tokenizer_path = tokenizer_path
         self.device = device
-        self.model = None
-        self.model_name = "nomic-embed-text-v1.5"
+        self.tokenizer = None
+        self.onnx_session = None
+        self.model_name = "LazarusNLP-indobert-onnx"
         self.embedding_dimension = 768
         
     def _load_model(self):
-        """Lazy load the sentence transformer model."""
-        if self.model is None:
+        """Lazy load the ONNX model and tokenizer."""
+        if self.tokenizer is None or self.onnx_session is None:
             try:
-                from sentence_transformers import SentenceTransformer
+                import onnxruntime as ort
+                from transformers import AutoTokenizer
                 
-                # Construct the actual model path with snapshots
-                actual_model_path = Path(self.tokenizer_path) / "snapshots" / "f752c1ee2994831dcef5b1e446383bc1e1996d52"
+                model_path = Path(self.tokenizer_path)
+                if not model_path.exists():
+                    raise FileNotFoundError(f"Model path does not exist: {model_path}")
                 
-                if not actual_model_path.exists():
-                    raise FileNotFoundError(f"Model path does not exist: {actual_model_path}")
+                logger.info(f"Loading ONNX embedding model from: {model_path}")
                 
-                logger.info(f"Loading embedding model from: {actual_model_path}")
-                self.model = SentenceTransformer(str(actual_model_path), device=self.device, trust_remote_code=True)
-                logger.info("Embedding model loaded successfully")
+                # Load tokenizer
+                self.tokenizer = AutoTokenizer.from_pretrained(str(model_path))
                 
-            except ImportError:
-                raise ImportError("sentence-transformers library is required for embedding generation. Install with: pip install sentence-transformers")
+                # Load ONNX model
+                onnx_model_path = model_path / "model.onnx"
+                if not onnx_model_path.exists():
+                    raise FileNotFoundError(f"ONNX model file not found: {onnx_model_path}")
+                
+                # Set ONNX Runtime providers based on device
+                providers = []
+                if self.device.lower() == "cuda":
+                    providers = ['CUDAExecutionProvider', 'CPUExecutionProvider']
+                else:
+                    providers = ['CPUExecutionProvider']
+                
+                self.onnx_session = ort.InferenceSession(str(onnx_model_path), providers=providers)
+                logger.info("ONNX embedding model loaded successfully")
+                
+            except ImportError as e:
+                raise ImportError(f"Required libraries missing. Install with: pip install onnxruntime transformers. Error: {e}")
             except Exception as e:
-                logger.error(f"Failed to load embedding model: {e}")
+                logger.error(f"Failed to load ONNX embedding model: {e}")
                 raise
     
+    def _encode_text(self, text: str) -> List[float]:
+        """
+        Encode a single text string using ONNX Runtime.
+        
+        Args:
+            text: Text to encode
+            
+        Returns:
+            List of floats representing the text embedding
+        """
+        if not text.strip():
+            return [0.0] * self.embedding_dimension
+        
+        # Tokenize text
+        inputs = self.tokenizer(
+            text,
+            truncation=True,
+            padding=True,
+            max_length=512,
+            return_tensors="np"
+        )
+        
+        # Run ONNX inference
+        onnx_inputs = {
+            "input_ids": inputs["input_ids"].astype(np.int64),
+            "attention_mask": inputs["attention_mask"].astype(np.int64)
+        }
+        
+        # Note: This ONNX model doesn't use token_type_ids, so we skip it
+        
+        outputs = self.onnx_session.run(None, onnx_inputs)
+        
+        # Extract embeddings (usually the last hidden state)
+        # Take mean pooling of token embeddings
+        last_hidden_state = outputs[0]  # Shape: (batch_size, seq_len, hidden_size)
+        attention_mask = inputs["attention_mask"]
+        
+        # Mean pooling with attention mask
+        mask_expanded = np.expand_dims(attention_mask, -1)
+        masked_embeddings = last_hidden_state * mask_expanded
+        summed_embeddings = np.sum(masked_embeddings, axis=1)
+        summed_mask = np.sum(mask_expanded, axis=1)
+        mean_embeddings = summed_embeddings / summed_mask
+        
+        # Convert to list and return
+        embedding = mean_embeddings[0].tolist()  # Take first (and only) item from batch
+        
+        return embedding
+
     def generate_document_embedding(self, document: DoclingDocument) -> List[float]:
         """
         Generate a single embedding vector for the entire document.
@@ -70,12 +135,8 @@ class EmbeddingService:
                 logger.warning("Document has no text content for embedding")
                 return [0.0] * self.embedding_dimension
             
-            # Generate embedding
-            embedding = self.model.encode(full_text, convert_to_tensor=False)
-            
-            # Ensure it's a list of floats
-            if isinstance(embedding, np.ndarray):
-                embedding = embedding.tolist()
+            # Generate embedding using ONNX
+            embedding = self._encode_text(full_text)
             
             logger.debug(f"Generated document embedding with dimension: {len(embedding)}")
             return embedding
@@ -101,30 +162,18 @@ class EmbeddingService:
                 logger.warning("No chunks provided for embedding")
                 return []
             
-            # Extract text from chunks
-            chunk_texts = []
+            # Extract text from chunks and generate embeddings individually
+            embeddings = []
             for chunk in chunks:
                 text = chunk.get('text', '').strip()
                 if not text:
                     # Handle empty chunks with zero vectors
-                    chunk_texts.append("")
+                    embedding = [0.0] * self.embedding_dimension
                 else:
-                    chunk_texts.append(text)
-            
-            if not any(chunk_texts):
-                logger.warning("All chunks are empty for embedding")
-                return [[0.0] * self.embedding_dimension] * len(chunks)
-            
-            # Generate embeddings in batch for efficiency
-            embeddings = self.model.encode(chunk_texts, convert_to_tensor=False)
-            
-            # Ensure proper format
-            if isinstance(embeddings, np.ndarray):
-                embeddings = embeddings.tolist()
-            
-            # Handle case where single chunk returns 1D array
-            if len(chunks) == 1 and isinstance(embeddings[0], (int, float)):
-                embeddings = [embeddings]
+                    # Generate embedding for this chunk
+                    embedding = self._encode_text(text)
+                
+                embeddings.append(embedding)
             
             logger.debug(f"Generated embeddings for {len(embeddings)} chunks")
             return embeddings

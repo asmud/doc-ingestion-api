@@ -2,6 +2,7 @@
 .claude*
 CLAUDE.md
 GEMINI.md
+ibm/
 
 # Python
 __pycache__/
